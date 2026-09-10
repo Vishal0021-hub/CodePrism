@@ -15,8 +15,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UserService {
 
-    public final UserRepository userRepository;
-    public final TextEncryptor tokenEncryptor;
+    private final UserRepository userRepository;
+    private final TextEncryptor tokenEncryptor;
 
 
     @Transactional
@@ -40,10 +40,6 @@ public class UserService {
         user.setAccessToken(encryptedToken);
         user.setTokenScopes(scopes);
         return userRepository.save(user);
-    }
-    public UserService(UserRepository userRepository, TextEncryptor tokenEncryptor) {
-        this.userRepository = userRepository;
-        this.tokenEncryptor = tokenEncryptor;
     }
 
 

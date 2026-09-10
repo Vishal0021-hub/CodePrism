@@ -24,12 +24,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-
     private final GithubOAuth2UserService gitHubOAuth2UserService;
-
-    public SecurityConfig(GithubOAuth2UserService gitHubOAuth2UserService) {
-        this.gitHubOAuth2UserService = gitHubOAuth2UserService;
-    }
 
     @Bean
     SecurityFilterChain securityFilterChain(
