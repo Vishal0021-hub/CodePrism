@@ -27,7 +27,7 @@ public class User {
     @Column(name="avatar_url", length= 500)
     private String avatarUrl;
 
-    @Column(name="acces_token",nullable = false, columnDefinition = "TEXT")
+    @Column(name="access_token",nullable = false, columnDefinition = "TEXT")
     private String accessToken;
 
     @Column(name="token_scopes",length=500)
@@ -37,13 +37,9 @@ public class User {
     private Instant createdAt;
 
     @PrePersist
-    void Oncreate(){
+    void onCreate(){
         if(createdAt==null){
             createdAt= Instant.now();
         }
-    }
-
-    public String getAccessToken() {
-        return "";
     }
 }

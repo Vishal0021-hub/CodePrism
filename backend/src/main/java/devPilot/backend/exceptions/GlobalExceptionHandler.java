@@ -1,7 +1,5 @@
 package devPilot.backend.exceptions;
 
-//import devPilot.backend.security.UnathorizedException;
-import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,7 +13,7 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(NotFoundExceptions.class)
-    ResponseEntity<Map<String,Object>> handleNotFound(ChangeSetPersister.NotFoundException ex){
+    ResponseEntity<Map<String,Object>> handleNotFound(NotFoundExceptions ex){
         return error(HttpStatus.NOT_FOUND,ex.getMessage());
     }
 
