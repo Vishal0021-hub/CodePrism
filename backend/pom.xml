@@ -11,21 +11,7 @@
 	<groupId>devPilot</groupId>
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
+	<description>DevPilot Backend</description>
 	<properties>
 		<java.version>21</java.version>
 		<spring-ai.version>2.0.1</spring-ai.version>
@@ -33,6 +19,13 @@
 		<maven.compiler.target>21</maven.compiler.target>
 	</properties>
 	<dependencies>
+		<!-- Source: https://mvnrepository.com/artifact/jakarta.validation/jakarta.validation-api -->
+		<dependency>
+			<groupId>jakarta.validation</groupId>
+			<artifactId>jakarta.validation-api</artifactId>
+			<version>3.1.1</version>
+			<scope>compile</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -58,10 +51,17 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jdbc</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-openai</artifactId>
 		</dependency>
-
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
@@ -93,17 +93,17 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-<!--	<dependencyManagement>-->
-<!--		<dependencies>-->
-<!--			<dependency>-->
-<!--				<groupId>org.springframework.ai</groupId>-->
-<!--				<artifactId>spring-ai-bom</artifactId>-->
-<!--				<version>${spring-ai.version}</version>-->
-<!--				<type>pom</type>-->
-<!--				<scope>import</scope>-->
-<!--			</dependency>-->
-<!--		</dependencies>-->
-<!--	</dependencyManagement>-->
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.ai</groupId>
+				<artifactId>spring-ai-bom</artifactId>
+				<version>${spring-ai.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<build>
 		<plugins>
@@ -114,6 +114,9 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<parameters>true</parameters>
+				</configuration>
 				<executions>
 					<execution>
 						<id>default-compile</id>
@@ -122,6 +125,7 @@
 							<goal>compile</goal>
 						</goals>
 						<configuration>
+							<parameters>true</parameters>
 							<annotationProcessorPaths>
 								<path>
 									<groupId>org.projectlombok</groupId>
@@ -137,6 +141,7 @@
 							<goal>testCompile</goal>
 						</goals>
 						<configuration>
+							<parameters>true</parameters>
 							<annotationProcessorPaths>
 								<path>
 									<groupId>org.projectlombok</groupId>
