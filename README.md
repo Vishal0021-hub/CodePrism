@@ -16,16 +16,47 @@
 
 ---
 
-## ✨ Features
+## ✨ Key Features & Capabilities
 
-- **🔐 GitHub OAuth2 Login** — Seamless one-click sign-in via GitHub. Your OAuth token is AES-encrypted at rest.
-- **📦 Repository Sync** — Automatically discovers and syncs all your GitHub repositories (public, private, collaborator, org).
-- **🧠 Intelligent Code Indexing** — Crawls repository file trees, filters relevant source files, splits code into semantic chunks, and embeds them as 3072-dimensional vectors.
-- **💾 PgVector Storage** — All embeddings are stored in PostgreSQL with the `pgvector` extension for lightning-fast cosine similarity search.
-- **💬 RAG-Powered Chat** — Ask natural language questions about any indexed repository. CodePrism retrieves the most relevant code chunks and streams AI-generated answers with file citations.
-- **⚡ Real-Time Streaming** — Responses are streamed token-by-token via Server-Sent Events (SSE), so you see the answer as it's being generated.
-- **📊 Indexing Dashboard** — Visual progress tracking with file counts, chunk counts, and status indicators (Pending → Indexing → Ready / Failed).
-- **🌙 Dark Mode** — Beautiful, responsive UI with dark/light theme toggle.
+- **🔐 GitHub OAuth2 Authentication with AES-256 Encryption**
+  - Seamless one-click sign-in via GitHub OAuth2 (`read:user`, `repo` scopes).
+  - User OAuth access tokens are securely **AES-256 encrypted at rest** using configurable PBKDF2 keys and salt before database persistence.
+
+- **📦 Automated Repository Discovery & Synchronization**
+  - Automatically fetches and synchronizes public, private, organization, and collaborative repositories from GitHub.
+  - One-click manual re-syncing with live database status updates.
+
+- **🧠 Intelligent AST Code Filtering & Ingestion**
+  - Smart recursive file tree traversal (`/git/trees/{branch}?recursive=1`).
+  - Automated exclusion of vendor directories (`node_modules`, `dist`, `build`, `.git`), binary files, lockfiles, and assets.
+  - Enforces a 100 KB safety file limit with automated programming language syntax detection.
+
+- **🧩 Context-Aware Semantic Code Chunking**
+  - Built with Spring AI `TokenTextSplitter` splitting code into optimal ~200 token segments.
+  - Automatically prepends file path headers (`// File: path/to/file.ext`) to every chunk, ensuring LLM understanding remains grounded even when functions are split across boundaries.
+  - Rich metadata tagging per chunk: `repoId`, `filePath`, `language`, and `chunkIndex`.
+
+- **💾 PgVector Similarity Store (3072 Dimensions)**
+  - Embedded using Google Gemini 3072-dimensional vector models (`gemini-embedding-001`).
+  - High-performance cosine distance (`<=>`) vector similarity indexing directly in PostgreSQL via the `pgvector` extension.
+  - Strict tenant and repository isolation ensuring searches only query the target repository.
+
+- **💬 Real-Time RAG Chat with Live Code Citations**
+  - Ask natural language questions about architecture, algorithms, dependencies, and functions across the codebase.
+  - Dynamic system prompt construction augmenting retrieved top-K code snippets into the LLM context window.
+  - Interactive **citation badges** linking directly to the cited source files and line ranges.
+
+- **⚡ Low-Latency Server-Sent Events (SSE) Streaming**
+  - Instant token-by-token response streaming via `SseEmitter` (`event: token`, `event: citations`, `event: assistant_message`, `event: done`).
+  - Smooth typing experience on the frontend with zero blocking or page reloads.
+
+- **🛡️ Adaptive Rate Limiting & 429 Exponential Backoff**
+  - Integrated delay controls to prevent triggering GitHub REST API rate limits.
+  - Automatic error inspection and retry backoff for Gemini API quota limits (429 Too Many Requests).
+
+- **📊 Live Indexing Dashboard & Modern UI**
+  - Real-time progress tracking displaying indexed file count, chunk count, and status badges (`PENDING` → `INDEXING` → `READY` / `FAILED`).
+  - Built with Next.js 16 (Turbopack), React 19, Tailwind CSS v4, Lucide icons, and full dark/light theme support.
 
 ---
 
