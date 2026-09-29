@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, GitBranch, MessageSquareCode, Sparkles } from "lucide-react";
 
-import { DevPilotIcon } from "@/components/icons/devpilot-icon";
+import { CodePrismIcon } from "@/components/icons/codeprism-icon";
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { BrandMark } from "@/components/layouts/app-shell";
 import { ModeToggle } from "@/components/ui/mode-toggle";
@@ -36,7 +36,7 @@ export default function HomePage() {
       <main className="relative z-10 mx-auto flex flex-1 w-full max-w-5xl flex-col justify-center gap-16 px-4 py-12 md:py-20">
         <section className="mx-auto max-w-2xl space-y-6 text-center">
           <div className="mx-auto flex size-16 items-center justify-center rounded-2xl shadow-md bg-card/60 backdrop-blur-sm border border-border/40 transition-transform duration-300 hover:scale-105">
-            <DevPilotIcon className="size-12 rounded-xl" />
+            <CodePrismIcon className="size-12 rounded-xl" />
           </div>
 
           <div className="space-y-3">
@@ -45,7 +45,7 @@ export default function HomePage() {
               <span>AI-Powered Repository Intelligence</span>
             </div>
             <h1 className="font-heading text-4xl font-bold tracking-tight sm:text-5xl text-foreground">
-              DevPilot
+              CodePrism
             </h1>
             <p className="text-lg text-muted-foreground text-balance max-w-xl mx-auto">
               Connect GitHub, index any repository, and chat with your codebase
@@ -112,7 +112,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-border/30 py-6 text-center text-xs text-muted-foreground">
-        DevPilot &bull; Intelligent Code Assistant
+        CodePrism &bull; Intelligent Code Assistant
       </footer>
     </div>
   );

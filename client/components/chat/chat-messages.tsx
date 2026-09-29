@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Bot, Code2, ExternalLink, FileCode, User } from "lucide-react";
 
-import { DevPilotIcon } from "@/components/icons/devpilot-icon";
+import { CodePrismIcon } from "@/components/icons/codeprism-icon";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ChatMessage, Citation, Repository } from "@/lib/api";
@@ -45,7 +45,7 @@ export function ChatMessages({
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
         <div className="mb-4 flex size-14 items-center justify-center rounded-2xl border border-border/50 bg-card/60 shadow-sm">
-          <DevPilotIcon className="size-8" />
+          <CodePrismIcon className="size-8" />
         </div>
         <h3 className="font-heading text-lg font-semibold tracking-tight">
           Chat with {repo.fullName}
@@ -89,7 +89,7 @@ export function ChatMessages({
               </div>
             ) : (
               <div className="flex size-8 shrink-0 select-none items-center justify-center rounded-full border border-border/50 bg-card shadow-xs">
-                <DevPilotIcon className="size-5" />
+                <CodePrismIcon className="size-5" />
               </div>
             )}
 
@@ -137,7 +137,7 @@ export function ChatMessages({
         {streamText && (
           <div className="flex gap-3.5 flex-row">
             <div className="flex size-8 shrink-0 select-none items-center justify-center rounded-full border border-border/50 bg-card shadow-xs">
-              <DevPilotIcon className="size-5" />
+              <CodePrismIcon className="size-5" />
             </div>
             <div className="flex flex-col space-y-2 max-w-[85%] sm:max-w-[75%] items-start">
               <div className="rounded-2xl rounded-tl-xs border border-border/60 bg-card/70 px-4 py-3 text-sm leading-relaxed backdrop-blur-xs">

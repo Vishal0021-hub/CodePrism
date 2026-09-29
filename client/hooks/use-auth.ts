@@ -6,7 +6,7 @@ import {useRouter} from "next/navigation";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
-export const AUTH_COOKIE = "devpilot_auth";
+export const AUTH_COOKIE = "codeprism_auth";
 
 
 export function setAuthCookie(authed: boolean) {

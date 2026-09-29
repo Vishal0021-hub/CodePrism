@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DevPilot - AI-Powered Repository Intelligence",
+  title: "CodePrism - AI-Powered Repository Intelligence",
   description:
     "Connect GitHub, index your codebases with RAG, and chat with precision citations.",
 };

@@ -1,20 +1,20 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: devpilot-postgres
+    container_name: codeprism-postgres
     environment:
-      POSTGRES_DB: devpilot
+      POSTGRES_DB: codeprism
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5433:5432"
     volumes:
-      - devpilot_pgdata:/var/lib/postgresql/data
+      - codeprism_pgdata:/var/lib/postgresql/data
       - ./docker/postgres/init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
     healthcheck:
-      test: ["CMD-SHELL","pg_isready -U postgres -d devpilot"]
+      test: ["CMD-SHELL","pg_isready -U postgres -d codeprism"]
       interval: 5s
       timeout: 5s
       retries: 5
 volumes:
-  devpilot_pgdata:
+  codeprism_pgdata:

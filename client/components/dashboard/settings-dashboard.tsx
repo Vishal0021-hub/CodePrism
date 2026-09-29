@@ -32,7 +32,7 @@ export function SettingsDashboard() {
         <CardHeader>
           <CardTitle>Profile</CardTitle>
           <CardDescription>
-            Your GitHub account connected to DevPilot.
+            Your GitHub account connected to CodePrism.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -80,7 +80,7 @@ export function SettingsDashboard() {
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
           <CardDescription>
-            Customize how DevPilot looks on your device.
+            Customize how CodePrism looks on your device.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

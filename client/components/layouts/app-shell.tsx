@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Settings } from "lucide-react";
 
-import { DevPilotIcon } from "@/components/icons/devpilot-icon";
+import { CodePrismIcon } from "@/components/icons/codeprism-icon";
 
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
@@ -68,11 +68,11 @@ export function AppShell({
               <SidebarMenuButton
                 size="lg"
                 render={<Link href="/dashboard" />}
-                tooltip="DevPilot"
+                tooltip="CodePrism"
               >
-                <DevPilotIcon className="size-8 rounded-[10px]" />
+                <CodePrismIcon className="size-8 rounded-[10px]" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">DevPilot</span>
+                  <span className="truncate font-semibold">CodePrism</span>
                   <span className="truncate text-xs text-muted-foreground">
                     Chat with your code
                   </span>
@@ -217,8 +217,8 @@ export function BrandMark({ className }: { className?: string }) {
         className
       )}
     >
-      <DevPilotIcon className="size-8 rounded-[10px]" />
-      <span className="font-heading text-[1.05rem] leading-none">DevPilot</span>
+      <CodePrismIcon className="size-8 rounded-[10px]" />
+      <span className="font-heading text-[1.05rem] leading-none">CodePrism</span>
     </div>
   );
 }

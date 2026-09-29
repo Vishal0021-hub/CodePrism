@@ -10,7 +10,7 @@
 
 **An AI-powered code navigation assistant that indexes your GitHub repositories and lets you chat with your codebase using RAG (Retrieval Augmented Generation).**
 
-[Features](#-features) • [Architecture](#-architecture) • [Getting Started](#-getting-started) • [Tech Stack](#-tech-stack) • [API Reference](#-api-reference) • [Documentation](file:///e:/Projects/GitHub/CodePrism/TECHNICAL_DOCS.md) • [Architecture Guide (PDF)](file:///e:/Projects/GitHub/CodePrism/docs/CodePrism_Architecture_and_Workflow.pdf) • [Git Roadmap](file:///e:/Projects/GitHub/CodePrism/GIT_COMMITS.md) • [License](#-license)
+[Features](#-features) • [Architecture](#-architecture) • [Getting Started](#-getting-started) • [Tech Stack](#-tech-stack) • [API Reference](#-api-reference) • [Documentation](./TECHNICAL_DOCS.md) • [Architecture Guide (PDF)](./docs/CodePrism_Architecture_and_Workflow.pdf) • [Git Roadmap](./GIT_COMMITS.md) • [License](#-license)
 
 </div>
 
@@ -230,7 +230,7 @@ Frontend starts on **http://localhost:3000**.
 ```
 CodePrism/
 ├── backend/                          # Spring Boot application
-│   └── src/main/java/devPilot/backend/
+│   └── src/main/java/codeprism/backend/
 │       ├── config/                   # Security, CORS, crypto configs
 │       ├── controller/               # REST controllers
 │       ├── dto/                      # Request/response DTOs
