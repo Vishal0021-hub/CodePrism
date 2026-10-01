@@ -3,6 +3,7 @@ import { getApiBaseUrl, ApiError, type ChatMessage } from "@/lib/api";
 export type StreamChatHandlers = {
   onUserMessage?: (message: ChatMessage) => void;
   onToken?: (token: string) => void;
+  onMetadata?: (meta: { sourcesCount?: number }) => void;
   onAssistantMessage?: (message: ChatMessage) => void;
   onDone?: () => void;
   onError?: (error: Error) => void;
@@ -73,6 +74,8 @@ export async function streamChatMessage(
       try {
         if (event === "token") {
           handlers.onToken?.(JSON.parse(data) as string);
+        } else if (event === "metadata") {
+          handlers.onMetadata?.(JSON.parse(data) as { sourcesCount?: number });
         } else if (event === "user_message") {
           handlers.onUserMessage?.(JSON.parse(data) as ChatMessage);
         } else if (event === "assistant_message") {

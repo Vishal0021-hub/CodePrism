@@ -42,7 +42,7 @@ export function ChatView({ repoId }: { repoId: string }) {
     selectedSessionId ?? sessionsQuery.data?.[0]?.id ?? null;
 
   const messagesQuery = useChatMessages(sessionId);
-  const { send, stop, streaming, streamText } = useStreamChat(sessionId);
+  const { send, stop, streaming, streamText, streamSourcesCount } = useStreamChat(sessionId);
 
   useEffect(() => {
     if (!ready || sessionsQuery.isLoading) return;
@@ -135,6 +135,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                 repo={repo}
                 messages={messagesQuery.data ?? []}
                 streamText={streamText}
+                streamSourcesCount={streamSourcesCount}
                 isLoading={messagesQuery.isLoading}
               />
               <ChatComposer

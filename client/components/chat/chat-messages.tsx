@@ -12,6 +12,7 @@ export interface ChatMessagesProps {
   repo: Repository;
   messages: ChatMessage[];
   streamText?: string;
+  streamSourcesCount?: number | null;
   isLoading?: boolean;
 }
 
@@ -19,6 +20,7 @@ export function ChatMessages({
   repo,
   messages,
   streamText = "",
+  streamSourcesCount = null,
   isLoading = false,
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -98,6 +100,18 @@ export function ChatMessages({
                 message.role === "USER" ? "items-end" : "items-start"
               }`}
             >
+              {message.role === "ASSISTANT" && message.sourcesCount !== undefined && message.sourcesCount !== null && message.sourcesCount > 0 && (
+                <div className="flex items-center gap-1.5 pb-0.5">
+                  <Badge
+                    variant="outline"
+                    className="inline-flex items-center gap-1 text-[11px] font-mono text-muted-foreground bg-muted/40 border-border/60"
+                  >
+                    <Code2 className="size-3 text-muted-foreground" />
+                    <span>{message.sourcesCount} relevant sources found</span>
+                  </Badge>
+                </div>
+              )}
+
               <div
                 className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   message.role === "USER"
@@ -140,6 +154,17 @@ export function ChatMessages({
               <CodePrismIcon className="size-5" />
             </div>
             <div className="flex flex-col space-y-2 max-w-[85%] sm:max-w-[75%] items-start">
+              {streamSourcesCount !== undefined && streamSourcesCount !== null && streamSourcesCount > 0 && (
+                <div className="flex items-center gap-1.5 pb-0.5">
+                  <Badge
+                    variant="outline"
+                    className="inline-flex items-center gap-1 text-[11px] font-mono text-muted-foreground bg-muted/40 border-border/60"
+                  >
+                    <Code2 className="size-3 text-muted-foreground" />
+                    <span>{streamSourcesCount} relevant sources found</span>
+                  </Badge>
+                </div>
+              )}
               <div className="rounded-2xl rounded-tl-xs border border-border/60 bg-card/70 px-4 py-3 text-sm leading-relaxed backdrop-blur-xs">
                 <div className="whitespace-pre-wrap">{streamText}</div>
                 <span className="inline-block size-1.5 animate-pulse rounded-full bg-primary ml-1" />

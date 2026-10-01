@@ -76,6 +76,7 @@ export function useStreamChat(sessionId: string | null) {
   const queryClient = useQueryClient();
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
+  const [streamSourcesCount, setStreamSourcesCount] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const stop = useCallback(() => {
@@ -165,6 +166,15 @@ export function useStreamChat(sessionId: string | null) {
                 }
                 accumulated += token;
                 setStreamText(accumulated);
+              } else if (event === "metadata") {
+                try {
+                  const meta = JSON.parse(data) as { sourcesCount?: number };
+                  if (meta.sourcesCount !== undefined) {
+                    setStreamSourcesCount(meta.sourcesCount);
+                  }
+                } catch {
+                  // ignore
+                }
               } else if (event === "assistant_message") {
                 const msg = JSON.parse(data) as ChatMessage;
                 // Replace the streaming text with the final message
@@ -173,6 +183,7 @@ export function useStreamChat(sessionId: string | null) {
                   (prev = []) => [...prev, msg]
                 );
                 accumulated = "";
+                setStreamSourcesCount(null);
               } else if (event === "done") {
                 // Stream complete
               }
@@ -190,6 +201,7 @@ export function useStreamChat(sessionId: string | null) {
             role: "ASSISTANT",
             content: accumulated,
             citations: [],
+            sourcesCount: streamSourcesCount ?? 0,
             createdAt: new Date().toISOString(),
           };
           queryClient.setQueryData<ChatMessage[]>(
@@ -215,11 +227,12 @@ export function useStreamChat(sessionId: string | null) {
       } finally {
         setStreaming(false);
         setStreamText("");
+        setStreamSourcesCount(null);
         abortControllerRef.current = null;
       }
     },
-    [sessionId, queryClient]
+    [sessionId, queryClient, streamSourcesCount]
   );
 
-  return { send, stop, streaming, streamText };
+  return { send, stop, streaming, streamText, streamSourcesCount };
 }

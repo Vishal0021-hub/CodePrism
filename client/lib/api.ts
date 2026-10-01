@@ -49,6 +49,7 @@ export type Citation = {
   startLine: number | null;
   endLine: number | null;
   language: string | null;
+  matchType?: string | null;
 };
 
 export type ChatMessage = {
@@ -56,6 +57,7 @@ export type ChatMessage = {
   role: "USER" | "ASSISTANT";
   content: string;
   citations: Citation[];
+  sourcesCount?: number | null;
   createdAt: string;
 };
 
