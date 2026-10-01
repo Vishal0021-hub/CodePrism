@@ -17,6 +17,7 @@ import codeprism.backend.entity.IndexStatus;
 import codeprism.backend.entity.Repository;
 import codeprism.backend.exceptions.BadRequestException;
 import codeprism.backend.exceptions.NotFoundException;
+import codeprism.backend.repository.CodeRelationshipRepository;
 import codeprism.backend.repository.RepositoryRepository;
 import codeprism.backend.services.UserService;
 import codeprism.backend.services.ai.RagSettings;
@@ -38,6 +39,8 @@ public class IndexingService {
     private final GithubApiClient gitHubApiClient;
     private final CodeFileFilter fileFilter;
     private final CodeChunker codeChunker;
+    private final CodeGraphExtractor codeGraphExtractor;
+    private final CodeRelationshipRepository codeRelationshipRepository;
     private final GitHubRateLimiter rateLimiter;
     private final VectorStore vectorStore;
 
@@ -92,9 +95,14 @@ public class IndexingService {
             try {
                 String content = gitHubApiClient.getFileContent(
                         token, repo.getOwner(), repo.getName(), path);
-                List<Document> chunks = codeChunker.chunkFile(repoId.toString(), path, content);
+                CodeChunker.ChunkResult chunkResult = codeChunker.chunkFileWithAst(repoId.toString(), path, content);
+                List<Document> chunks = chunkResult.documents();
                 batch.addAll(chunks);
                 totalChunks += chunks.size();
+
+                if (chunkResult.compilationUnit() != null) {
+                    codeGraphExtractor.extractAndSave(repoId, path, chunkResult.compilationUnit());
+                }
                 if (batch.size() >= VECTOR_BATCH_SIZE) {
                     safeAddVectors(batch);
                     batch.clear();
@@ -188,6 +196,11 @@ public class IndexingService {
             vectorStore.delete(filter);
         } catch (Exception ex) {
             log.warn("Could not delete existing vectors for repo {}: {}", repoId, ex.getMessage());
+        }
+        try {
+            codeRelationshipRepository.deleteByRepositoryId(UUID.fromString(repoId));
+        } catch (Exception ex) {
+            log.warn("Could not delete existing code relationships for repo {}: {}", repoId, ex.getMessage());
         }
     }
 
