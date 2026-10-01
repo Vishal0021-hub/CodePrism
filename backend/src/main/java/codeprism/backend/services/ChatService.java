@@ -108,13 +108,16 @@ public class ChatService {
 
         // 4. Build LLM prompts from retrieved context + question
         String systemPrompt = chatPromptBuilder.systemPrompt(repo.getFullName());
-        String userPrompt = chatPromptBuilder.userPrompt(retrievedContext.contextText(), userContent);
+        String userPrompt = chatPromptBuilder.userPrompt(
+                retrievedContext.semanticContextText(),
+                retrievedContext.structuralContextText(),
+                userContent);
 
         // 5. Stream OpenAI response to the client (SSE)
         return chatStreamHandler.stream(
                 session.getId(),
                 toMessageResponse(userMessage),
-                retrievedContext.citations(),
+                retrievedContext,
                 systemPrompt,
                 userPrompt);
     }
@@ -133,6 +136,7 @@ public class ChatService {
                 message.getRole(),
                 message.getContent(),
                 citationMapper.fromJson(message.getCitations()),
+                message.getSourcesCount(),
                 message.getCreatedAt());
     }
 }

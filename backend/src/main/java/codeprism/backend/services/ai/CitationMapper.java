@@ -22,12 +22,21 @@ public class CitationMapper {
     private final JsonMapper jsonMapper;
 
     public CitationDto fromDocument(Document document) {
+        return fromDocument(document, "semantic");
+    }
+
+    public CitationDto fromDocument(Document document, String defaultMatchType) {
         var meta = document.getMetadata();
+        String matchType = meta.get("matchType") != null
+                ? String.valueOf(meta.get("matchType"))
+                : defaultMatchType;
+
         return new CitationDto(
                 stringVal(meta.get("filePath")),
                 intVal(meta.get("startLine")),
                 intVal(meta.get("endLine")),
-                stringVal(meta.get("language")));
+                stringVal(meta.get("language")),
+                matchType);
     }
 
     public String toJson(List<CitationDto> citations) {

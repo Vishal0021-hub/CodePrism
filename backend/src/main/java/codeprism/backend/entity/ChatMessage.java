@@ -44,6 +44,9 @@ public class ChatMessage {
     @Column(columnDefinition = "TEXT")
     private String citations;
 
+    @Column(name = "sources_count")
+    private Integer sourcesCount;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

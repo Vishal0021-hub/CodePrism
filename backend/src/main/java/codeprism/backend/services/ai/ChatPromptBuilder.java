@@ -24,13 +24,33 @@ public class ChatPromptBuilder {
                 """.formatted(repositoryFullName);
     }
 
-    public String userPrompt(String codeContext, String question) {
+    public String userPrompt(String semanticContext, String structuralContext, String question) {
         return """
-                Code context:
+                Directly relevant code:
+                %s
+
+                Related code (calls / called by):
                 %s
 
                 User question:
                 %s
-                """.formatted(codeContext, question);
+                """.formatted(
+                    (semanticContext == null || semanticContext.isBlank()) ? "(none)" : semanticContext,
+                    (structuralContext == null || structuralContext.isBlank()) ? "(none)" : structuralContext,
+                    question
+                );
+    }
+
+    public String userPrompt(String codeContext, String question) {
+        if (codeContext != null && codeContext.contains("Directly relevant code:")) {
+            return """
+                    Code context:
+                    %s
+
+                    User question:
+                    %s
+                    """.formatted(codeContext, question);
+        }
+        return userPrompt(codeContext, "(none)", question);
     }
 }
