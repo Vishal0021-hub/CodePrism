@@ -39,6 +39,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/login-url",
+                                "/api/webhooks/**",
+                                "/actuator/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/error")

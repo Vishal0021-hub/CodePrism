@@ -11,6 +11,11 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.beans.factory.annotation.Autowired;
 import codeprism.backend.dto.ChatMessageResponse;
 import codeprism.backend.dto.CitationDto;
 import codeprism.backend.entity.ChatMessage;
@@ -29,6 +34,9 @@ public class ChatStreamHandler {
     private final ChatMessageRepository chatMessageRepository;
     private final CitationMapper citationMapper;
     private final double similarityThreshold;
+
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
 
     public ChatStreamHandler(
             ChatModel chatModel,
@@ -87,6 +95,9 @@ public class ChatStreamHandler {
                     .name("metadata")
                     .data(Map.of("sourcesCount", sourcesCount)));
 
+            AtomicInteger tokenCounter = new AtomicInteger(0);
+            Timer.Sample chatSample = meterRegistry != null ? Timer.start(meterRegistry) : null;
+
             ChatClient.builder(chatModel)
                     .build()
                     .prompt()
@@ -94,13 +105,20 @@ public class ChatStreamHandler {
                     .user(userPrompt)
                     .stream()
                     .content()
-                    .doOnNext(token -> appendToken(emitter, fullReply, token))
+                    .doOnNext(token -> {
+                        tokenCounter.incrementAndGet();
+                        appendToken(emitter, fullReply, token);
+                    })
                     .doOnError(err -> {
                         log.error("Chat stream error", err);
+                        recordChatMetrics(chatSample, tokenCounter.get());
                         emitter.completeWithError(err);
                     })
-                    .doOnComplete(() -> completeStream(
-                            emitter, sessionId, fullReply, retrievedContext.citations(), sourcesCount))
+                    .doOnComplete(() -> {
+                        recordChatMetrics(chatSample, tokenCounter.get());
+                        completeStream(
+                                emitter, sessionId, fullReply, retrievedContext.citations(), sourcesCount);
+                    })
                     .subscribe();
         } catch (Exception ex) {
             emitter.completeWithError(ex);
@@ -167,5 +185,24 @@ public class ChatStreamHandler {
                 citationMapper.fromJson(message.getCitations()),
                 sourcesCount != null ? sourcesCount : message.getSourcesCount(),
                 message.getCreatedAt());
+    }
+
+    private void recordChatMetrics(Timer.Sample chatSample, int tokens) {
+        if (meterRegistry != null) {
+            try {
+                DistributionSummary.builder("codeprism.gemini.chat.tokens")
+                        .description("Gemini chat completion token usage per request")
+                        .register(meterRegistry)
+                        .record(tokens);
+
+                if (chatSample != null) {
+                    chatSample.stop(Timer.builder("codeprism.gemini.chat.duration")
+                            .description("Gemini chat completion latency per request")
+                            .register(meterRegistry));
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to record chat completion metrics: {}", ex.getMessage());
+            }
+        }
     }
 }

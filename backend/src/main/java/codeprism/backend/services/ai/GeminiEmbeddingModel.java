@@ -22,6 +22,10 @@ import org.springframework.web.client.RestClientResponseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -47,6 +51,9 @@ public class GeminiEmbeddingModel implements EmbeddingModel {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String modelName;
+
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
 
     public GeminiEmbeddingModel(
             @Value("${spring.ai.openai.base-url:https://generativelanguage.googleapis.com/v1beta/openai/}") String baseUrl,
@@ -105,6 +112,7 @@ public class GeminiEmbeddingModel implements EmbeddingModel {
         );
 
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            Timer.Sample sample = meterRegistry != null ? Timer.start(meterRegistry) : null;
             try {
                 String responseJson = restClient.post()
                         .uri("embeddings")
@@ -144,6 +152,13 @@ public class GeminiEmbeddingModel implements EmbeddingModel {
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("Interrupted during retry backoff", ie);
+                }
+            } finally {
+                if (sample != null && meterRegistry != null) {
+                    sample.stop(Timer.builder("codeprism.gemini.embedding.latency")
+                            .description("Gemini embedding call latency")
+                            .tag("model", modelName)
+                            .register(meterRegistry));
                 }
             }
         }
