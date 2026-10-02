@@ -23,5 +23,7 @@ public record RepositoryResponse(
         int chunkCount,
         int filesTotal,
         int filesProcessed,
-        String errorMessage) {
+        String errorMessage,
+        String lastIndexedCommitSha,
+        boolean autoSync) {
 }

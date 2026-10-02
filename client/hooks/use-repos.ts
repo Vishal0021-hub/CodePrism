@@ -116,6 +116,33 @@ export function useRefreshRepos() {
   });
 }
 
+export function useToggleAutoSync() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled?: boolean }) =>
+      api.toggleAutoSync(id, enabled),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.repos.detail(updated.id), updated);
+      updateRepoInListCache(queryClient, updated);
+      toast.add({
+        title: updated.autoSync ? "Auto-sync enabled" : "Auto-sync disabled",
+        description: updated.autoSync
+          ? `Webhook pushes to ${updated.name} will automatically reindex changed files.`
+          : `Webhook automatic reindexing paused for ${updated.name}.`,
+        type: "success",
+      });
+    },
+    onError: (error: Error) => {
+      toast.add({
+        title: "Could not update auto-sync",
+        description: error.message,
+        type: "error",
+      });
+    },
+  });
+}
+
 export function getRepoProgress(repo: Pick<
   Repository,
   "filesProcessed" | "filesTotal"

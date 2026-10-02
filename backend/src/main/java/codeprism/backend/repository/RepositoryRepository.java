@@ -11,4 +11,6 @@ public interface RepositoryRepository extends JpaRepository<Repository, UUID> {
     Optional<Repository> findByUserIdAndGithubRepoId(UUID userId, Long githubRepoId);
     List<Repository> findByUserIdOrderByFullNameAsc(UUID userId);
     Optional<Repository> findByIdAndUserId(UUID id, UUID userId);
+    List<Repository> findByFullName(String fullName);
+    List<Repository> findByGithubRepoId(Long githubRepoId);
 }

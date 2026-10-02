@@ -84,6 +84,13 @@ public class Repository {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    @Column(name = "last_indexed_commit_sha", length = 100)
+    private String lastIndexedCommitSha;
+
+    @Column(name = "auto_sync", nullable = false)
+    @Builder.Default
+    private boolean autoSync = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();

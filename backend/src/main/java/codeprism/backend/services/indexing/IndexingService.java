@@ -23,6 +23,12 @@ import codeprism.backend.services.UserService;
 import codeprism.backend.services.ai.RagSettings;
 import codeprism.backend.services.github.GitHubRateLimiter;
 import codeprism.backend.services.github.GithubApiClient;
+import codeprism.backend.entity.User;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +49,12 @@ public class IndexingService {
     private final CodeRelationshipRepository codeRelationshipRepository;
     private final GitHubRateLimiter rateLimiter;
     private final VectorStore vectorStore;
+
+    @Autowired(required = false)
+    private NamedParameterJdbcTemplate jdbcTemplate;
+
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
 
     @Value("${app.indexing.max-file-bytes:102400}")
     private long maxFileBytes;
@@ -75,60 +87,71 @@ public class IndexingService {
     }
 
     private void doIndex(UUID repoId, UUID userId) {
-        Repository repo = repositoryRepository.findById(repoId)
-                .orElseThrow(() -> new NotFoundException("Repository not found"));
-        String token = userService.decryptAccessToken(userService.requiredById(userId));
+        Timer.Sample sample = meterRegistry != null ? Timer.start(meterRegistry) : null;
+        Repository repo = null;
+        try {
+            repo = repositoryRepository.findById(repoId)
+                    .orElseThrow(() -> new NotFoundException("Repository not found"));
+            String token = userService.decryptAccessToken(userService.requiredById(userId));
 
-        deleteExistingVectors(repoId.toString());
+            deleteExistingVectors(repoId.toString());
 
-        Map<String, Object> tree = gitHubApiClient.getRepoTree(
-                token, repo.getOwner(), repo.getName(), repo.getDefaultBranch());
-        List<String> filePaths = listIndexableFiles(tree);
+            Map<String, Object> tree = gitHubApiClient.getRepoTree(
+                    token, repo.getOwner(), repo.getName(), repo.getDefaultBranch());
+            List<String> filePaths = listIndexableFiles(tree);
 
-        updateProgress(repoId, filePaths.size(), 0, 0, IndexStatus.INDEXING, null);
+            updateProgress(repoId, filePaths.size(), 0, 0, IndexStatus.INDEXING, null);
 
-        List<Document> batch = new ArrayList<>();
-        int processed = 0;
-        int totalChunks = 0;
+            List<Document> batch = new ArrayList<>();
+            int processed = 0;
+            int totalChunks = 0;
 
-        for (String path : filePaths) {
-            try {
-                String content = gitHubApiClient.getFileContent(
-                        token, repo.getOwner(), repo.getName(), path);
-                CodeChunker.ChunkResult chunkResult = codeChunker.chunkFileWithAst(repoId.toString(), path, content);
-                List<Document> chunks = chunkResult.documents();
-                batch.addAll(chunks);
-                totalChunks += chunks.size();
+            for (String path : filePaths) {
+                try {
+                    String content = gitHubApiClient.getFileContent(
+                            token, repo.getOwner(), repo.getName(), path);
+                    CodeChunker.ChunkResult chunkResult = codeChunker.chunkFileWithAst(repoId.toString(), path, content);
+                    List<Document> chunks = chunkResult.documents();
+                    batch.addAll(chunks);
+                    totalChunks += chunks.size();
 
-                if (chunkResult.compilationUnit() != null) {
-                    codeGraphExtractor.extractAndSave(repoId, path, chunkResult.compilationUnit());
-                }
-                if (batch.size() >= VECTOR_BATCH_SIZE) {
-                    safeAddVectors(batch);
-                    batch.clear();
-                    try {
-                        Thread.sleep(600);
-                    } catch (InterruptedException ignored) {
-                        Thread.currentThread().interrupt();
+                    if (chunkResult.compilationUnit() != null) {
+                        codeGraphExtractor.extractAndSave(repoId, path, chunkResult.compilationUnit());
                     }
+                    if (batch.size() >= VECTOR_BATCH_SIZE) {
+                        safeAddVectors(batch);
+                        batch.clear();
+                        try {
+                            Thread.sleep(600);
+                        } catch (InterruptedException ignored) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                } catch (Exception ex) {
+                    log.warn("Skipping file {} in {}: {}", path, repo.getFullName(), ex.getMessage());
                 }
-            } catch (Exception ex) {
-                log.warn("Skipping file {} in {}: {}", path, repo.getFullName(), ex.getMessage());
+
+                processed++;
+                if (processed % PROGRESS_EVERY_N_FILES == 0 || processed == filePaths.size()) {
+                    updateProgress(repoId, filePaths.size(), processed, totalChunks, IndexStatus.INDEXING, null);
+                }
+                rateLimiter.pause();
             }
 
-            processed++;
-            if (processed % PROGRESS_EVERY_N_FILES == 0 || processed == filePaths.size()) {
-                updateProgress(repoId, filePaths.size(), processed, totalChunks, IndexStatus.INDEXING, null);
+            if (!batch.isEmpty()) {
+                safeAddVectors(batch);
+                batch.clear();
             }
-            rateLimiter.pause();
-        }
 
-        if (!batch.isEmpty()) {
-            safeAddVectors(batch);
-            batch.clear();
+            markReady(repoId, filePaths.size(), processed, totalChunks, repo.getFullName());
+        } finally {
+            if (sample != null && meterRegistry != null) {
+                sample.stop(Timer.builder("codeprism.indexing.duration")
+                        .description("Indexing duration per repository")
+                        .tag("repo", repo != null ? repo.getFullName() : repoId.toString())
+                        .register(meterRegistry));
+            }
         }
-
-        markReady(repoId, filePaths.size(), processed, totalChunks, repo.getFullName());
     }
 
     private void safeAddVectors(List<Document> batch) {
@@ -248,6 +271,127 @@ public class IndexingService {
             repo.setUpdatedAt(Instant.now());
             repositoryRepository.save(repo);
         });
+    }
+
+    public void reindexFiles(Long repositoryId, List<String> changedPaths) {
+        reindexFiles(repositoryId, changedPaths, null);
+    }
+
+    public void reindexFiles(Long repositoryId, List<String> changedPaths, String commitSha) {
+        List<Repository> repos = repositoryRepository.findByGithubRepoId(repositoryId);
+        for (Repository repo : repos) {
+            doReindexFiles(repo, changedPaths, commitSha);
+        }
+    }
+
+    public void reindexFiles(UUID repoId, List<String> changedPaths, String commitSha) {
+        repositoryRepository.findById(repoId).ifPresent(repo -> doReindexFiles(repo, changedPaths, commitSha));
+    }
+
+    @Transactional
+    public void doReindexFiles(Repository repo, List<String> changedPaths, String commitSha) {
+        if (changedPaths == null || changedPaths.isEmpty()) {
+            if (commitSha != null && !commitSha.isBlank()) {
+                repo.setLastIndexedCommitSha(commitSha);
+                repo.setUpdatedAt(Instant.now());
+                repositoryRepository.save(repo);
+            }
+            return;
+        }
+
+        UUID repoId = repo.getId();
+        log.info("Reindexing {} files for repo {} ({})", changedPaths.size(), repo.getFullName(), repoId);
+
+        // 1. Delete existing CodeRelationship rows for those paths only
+        try {
+            codeRelationshipRepository.deleteByRepositoryIdAndFilePathIn(repoId, changedPaths);
+        } catch (Exception ex) {
+            log.warn("Failed to delete existing CodeRelationships for repo {} on paths {}: {}",
+                    repoId, changedPaths, ex.getMessage());
+        }
+
+        // 2. Delete existing chunks in vectorStore for those paths only
+        deleteChunksForFiles(repoId.toString(), changedPaths);
+
+        // 3. Re-run CodeChunker + CodeGraphExtractor on just those files via the GitHub API
+        User user = userService.requiredById(repo.getUserId());
+        String token = userService.decryptAccessToken(user);
+
+        List<Document> newChunks = new ArrayList<>();
+        for (String path : changedPaths) {
+            if (!fileFilter.isEligible(path, 0L, maxFileBytes)) {
+                log.debug("Skipping unindexable changed file {}", path);
+                continue;
+            }
+
+            try {
+                String content = gitHubApiClient.getFileContent(token, repo.getOwner(), repo.getName(), path);
+                if (content == null || content.length() > maxFileBytes) {
+                    continue;
+                }
+
+                CodeChunker.ChunkResult chunkResult = codeChunker.chunkFileWithAst(repoId.toString(), path, content);
+                List<Document> chunks = chunkResult.documents();
+                if (!chunks.isEmpty()) {
+                    newChunks.addAll(chunks);
+                }
+
+                if (chunkResult.compilationUnit() != null) {
+                    codeGraphExtractor.extractAndSave(repoId, path, chunkResult.compilationUnit());
+                }
+            } catch (Exception ex) {
+                // If file was deleted or cannot be read, chunks and relationships were already deleted above
+                log.info("Changed file {} could not be fetched (may have been deleted): {}", path, ex.getMessage());
+            }
+        }
+
+        if (!newChunks.isEmpty()) {
+            safeAddVectors(newChunks);
+        }
+
+        // 4. Update lastIndexedCommitSha
+        if (commitSha != null && !commitSha.isBlank()) {
+            repo.setLastIndexedCommitSha(commitSha);
+        }
+        repo.setIndexedAt(Instant.now());
+        repo.setUpdatedAt(Instant.now());
+        repositoryRepository.save(repo);
+        log.info("Finished reindexing files for repo {}", repo.getFullName());
+    }
+
+    private void deleteChunksForFiles(String repoId, List<String> paths) {
+        if (paths == null || paths.isEmpty()) {
+            return;
+        }
+
+        if (jdbcTemplate != null) {
+            try {
+                String sql = """
+                    DELETE FROM vector_store
+                    WHERE (metadata->>'repoId' = :repoId OR metadata->>'repo_id' = :repoId)
+                      AND metadata->>'filePath' IN (:filePaths)
+                """;
+                jdbcTemplate.update(sql, new MapSqlParameterSource()
+                        .addValue("repoId", repoId)
+                        .addValue("filePaths", paths));
+                return;
+            } catch (Exception ex) {
+                log.warn("Direct SQL chunk delete failed for repo {}: {}", repoId, ex.getMessage());
+            }
+        }
+
+        for (String path : paths) {
+            try {
+                var b = new FilterExpressionBuilder();
+                var filter = b.and(
+                        b.eq(RagSettings.METADATA_REPO_ID, repoId),
+                        b.eq("filePath", path)
+                ).build();
+                vectorStore.delete(filter);
+            } catch (Exception ex) {
+                log.warn("Vector store delete failed for repo {} file {}: {}", repoId, path, ex.getMessage());
+            }
+        }
     }
 
 }

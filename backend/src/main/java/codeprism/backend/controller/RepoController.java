@@ -60,4 +60,12 @@ public class RepoController {
         return repoService.status(id, userId);
     }
 
+    @PostMapping("/{id}/auto-sync")
+    public RepositoryResponse toggleAutoSync(
+            @PathVariable("id") UUID id,
+            @RequestParam(name = "enabled", required = false) Boolean enabled) {
+        UUID userId = currentUser.require().getId();
+        return repoService.updateAutoSync(id, userId, enabled);
+    }
+
 }

@@ -156,7 +156,19 @@ public class RepoService {
                 repo.getChunkCount(),
                 repo.getFilesTotal(),
                 repo.getFilesProcessed(),
-                repo.getErrorMessage());
+                repo.getErrorMessage(),
+                repo.getLastIndexedCommitSha(),
+                repo.isAutoSync());
+    }
+
+    @Transactional
+    public RepositoryResponse updateAutoSync(UUID repoId, UUID userId, Boolean enabled) {
+        Repository repo = requireOwned(repoId, userId);
+        boolean target = enabled != null ? enabled : !repo.isAutoSync();
+        repo.setAutoSync(target);
+        repo.setUpdatedAt(Instant.now());
+        Repository saved = repositoryRepository.save(repo);
+        return toResponse(saved);
     }
 
     private static Long toLong(Object value) {

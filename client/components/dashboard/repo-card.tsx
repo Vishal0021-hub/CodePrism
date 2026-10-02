@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ExternalLink,
   GitBranch,
+  GitCommit,
   Lock,
   MessageSquare,
   RotateCcw,
@@ -18,13 +19,15 @@ import { LanguageIcon } from "@/components/icons/language-icon";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
-import { getRepoProgress, useStartIndexing } from "@/hooks/use-repos";
+import { Switch } from "@/components/ui/switch";
+import { getRepoProgress, useStartIndexing, useToggleAutoSync } from "@/hooks/use-repos";
 import type { Repository } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function RepoCard({ repo }: { repo: Repository }) {
   const router = useRouter();
   const indexMutation = useStartIndexing();
+  const toggleAutoSyncMutation = useToggleAutoSync();
   const isIndexing = repo.indexStatus === "INDEXING" || indexMutation.isPending;
   const isFailed = repo.indexStatus === "FAILED";
   const progress = getRepoProgress(repo);
@@ -108,6 +111,33 @@ export function RepoCard({ repo }: { repo: Repository }) {
               {isFailed ? " indexed" : ""}
             </span>
           )}
+          {repo.lastIndexedCommitSha && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 font-mono text-xs text-muted-foreground"
+              title={`Last indexed commit: ${repo.lastIndexedCommitSha}`}
+            >
+              <GitCommit className="size-3" />
+              {repo.lastIndexedCommitSha.substring(0, 7)}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-xs">
+          <div className="flex flex-col">
+            <span className="font-medium text-foreground">Auto-sync</span>
+            <span className="text-[11px] text-muted-foreground">
+              {repo.autoSync ? "Active on webhook push" : "Disabled"}
+            </span>
+          </div>
+          <Switch
+            checked={repo.autoSync ?? false}
+            disabled={toggleAutoSyncMutation.isPending}
+            onCheckedChange={(checked) =>
+              toggleAutoSyncMutation.mutate({ id: repo.id, enabled: checked })
+            }
+            size="sm"
+            aria-label="Toggle auto-sync"
+          />
         </div>
 
         {isIndexing && (
