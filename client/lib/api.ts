@@ -25,6 +25,8 @@ export type Repository = {
   filesTotal: number;
   filesProcessed: number;
   errorMessage: string | null;
+  lastIndexedCommitSha?: string | null;
+  autoSync?: boolean;
 };
 
 export type IndexStatusResponse = {
@@ -59,6 +61,13 @@ export type ChatMessage = {
   citations: Citation[];
   sourcesCount?: number | null;
   createdAt: string;
+};
+export type SymbolMatch = {
+  filePath: string;
+  symbolName: string;
+  lineNumber: number | null;
+  snippet: string;
+  exactMatch: boolean;
 };
 
 
@@ -137,4 +146,13 @@ export const api = {
     ),
   getMessages: (sessionId: string) =>
     apiFetch<ChatMessage[]>(`/api/chat/sessions/${sessionId}`),
+  findSymbols: (id: string, symbol: string) =>
+    apiFetch<SymbolMatch[]>(
+      `/api/repos/${id}/find?symbol=${encodeURIComponent(symbol)}`
+    ),
+  toggleAutoSync: (id: string, enabled?: boolean) =>
+    apiFetch<Repository>(
+      `/api/repos/${id}/auto-sync${enabled !== undefined ? `?enabled=${enabled}` : ""}`,
+      { method: "POST" }
+    ),
 };

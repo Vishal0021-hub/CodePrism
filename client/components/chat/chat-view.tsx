@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageSquare, Search } from "lucide-react";
 
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { FindTab } from "@/components/chat/find-tab";
 import { IndexingState } from "@/components/chat/indexing-state";
 import { AppShell } from "@/components/layouts/app-shell";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
   useChatMessages,
   useChatSessions,
@@ -36,6 +38,7 @@ export function ChatView({ repoId }: { repoId: string }) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null
   );
+  const [activeTab, setActiveTab] = useState<"chat" | "find">("chat");
   const autoCreateRef = useRef(false);
 
   const sessionId =
@@ -131,19 +134,55 @@ export function ChatView({ repoId }: { repoId: string }) {
             <IndexingState repo={repo} status={statusQuery.data} />
           ) : (
             <>
-              <ChatMessages
-                repo={repo}
-                messages={messagesQuery.data ?? []}
-                streamText={streamText}
-                streamSourcesCount={streamSourcesCount}
-                isLoading={messagesQuery.isLoading}
-              />
-              <ChatComposer
-                disabled={!sessionId}
-                streaming={streaming}
-                onSend={send}
-                onStop={stop}
-              />
+              {/* Tab Navigation */}
+              <div className="flex items-center gap-1 border-b border-border/60 bg-muted/20 px-4 py-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("chat")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    activeTab === "chat"
+                      ? "bg-background text-foreground shadow-xs border border-border/60"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
+                >
+                  <MessageSquare className="size-3.5" />
+                  Chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("find")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    activeTab === "find"
+                      ? "bg-background text-foreground shadow-xs border border-border/60"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
+                >
+                  <Search className="size-3.5" />
+                  Find
+                </button>
+              </div>
+
+              {activeTab === "chat" ? (
+                <>
+                  <ChatMessages
+                    repo={repo}
+                    messages={messagesQuery.data ?? []}
+                    streamText={streamText}
+                    streamSourcesCount={streamSourcesCount}
+                    isLoading={messagesQuery.isLoading}
+                  />
+                  <ChatComposer
+                    disabled={!sessionId}
+                    streaming={streaming}
+                    onSend={send}
+                    onStop={stop}
+                  />
+                </>
+              ) : (
+                <FindTab repo={repo} />
+              )}
             </>
           )}
         </section>

@@ -30,7 +30,23 @@ public interface CodeRelationshipRepository extends JpaRepository<CodeRelationsh
             @Param("repoId") UUID repoId,
             @Param("symbols") Collection<String> symbols);
 
+    @Query("""
+        SELECT r FROM CodeRelationship r
+        WHERE r.repositoryId = :repoId
+          AND (LOWER(r.sourceSymbol) LIKE LOWER(CONCAT('%', :symbol, '%'))
+            OR LOWER(r.targetSymbol) LIKE LOWER(CONCAT('%', :symbol, '%')))
+    """)
+    List<CodeRelationship> findBySymbolContaining(
+            @Param("repoId") UUID repoId,
+            @Param("symbol") String symbol);
+
     @Modifying
     @Query("DELETE FROM CodeRelationship r WHERE r.repositoryId = :repoId")
     void deleteByRepositoryId(@Param("repoId") UUID repoId);
+
+    @Modifying
+    @Query("DELETE FROM CodeRelationship r WHERE r.repositoryId = :repoId AND r.filePath IN :filePaths")
+    void deleteByRepositoryIdAndFilePathIn(
+            @Param("repoId") UUID repoId,
+            @Param("filePaths") Collection<String> filePaths);
 }
