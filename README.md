@@ -10,7 +10,7 @@
 
 **An AI-powered code navigation assistant that indexes your GitHub repositories and lets you chat with your codebase using RAG (Retrieval Augmented Generation).**
 
-[Features](#-features) • [Architecture](#-architecture) • [Getting Started](#-getting-started) • [Tech Stack](#-tech-stack) • [API Reference](#-api-reference) • [Documentation](./TECHNICAL_DOCS.md) • [Architecture Guide (PDF)](./docs/CodePrism_Architecture_and_Workflow.pdf) • [Git Roadmap](./GIT_COMMITS.md) • [License](#-license)
+[Features](#-features) • [Architecture](#-architecture) • [Getting Started](#-getting-started) • [Tech Stack](#-tech-stack) • [API Reference](#-api-reference) • [Run Guide](./RUN_GUIDE.md) • [Documentation](./TECHNICAL_DOCS.md) • [Architecture Guide (PDF)](./docs/CodePrism_Architecture_and_Workflow.pdf) • [Git Roadmap](./GIT_COMMITS.md) • [License](#-license)
 
 </div>
 
@@ -137,23 +137,25 @@ NEXT_PUBLIC_API_URL=http://localhost:8081
 ```
 
 ### 4. Start the Backend
-
+ 
 ```bash
 cd backend
 ./mvnw spring-boot:run
 ```
-
-Backend starts on **http://localhost:8081**.
-
+ 
+Backend starts on **http://localhost:8081**. *(On Windows PowerShell, use `.\mvnw.cmd spring-boot:run`)*.
+ 
 ### 5. Start the Frontend
-
+ 
 ```bash
 cd client
 npm install
 npm run dev
 ```
-
+ 
 Frontend starts on **http://localhost:3000**.
+ 
+> For full OS-specific commands, persistent environment variables setup, and troubleshooting, see the [Application Run Guide](./RUN_GUIDE.md).
 
 ### 6. Use CodePrism
 
