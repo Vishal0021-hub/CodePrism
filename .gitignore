@@ -14,12 +14,27 @@ out/
 *.class
 *.jar
 *.war
+*.tsbuildinfo
+
+# JVM Crash Logs & Profiling
+hs_err_pid*
+replay_pid*
 
 # IDE and Editors
 .vscode/
 .idea/
 *.swp
 *.swo
+*.iml
+*.ipr
+*.iws
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
 
 # OS files
 .DS_Store
@@ -35,3 +50,4 @@ Thumbs.db
 .env
 .env*.local
 *.env
+

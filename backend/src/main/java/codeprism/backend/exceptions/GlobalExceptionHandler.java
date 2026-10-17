@@ -17,8 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({NotFoundException.class, NotFoundExceptions.class})
-    ResponseEntity<Map<String, Object>> handleNotFound(Exception ex) {
+    @ExceptionHandler(NotFoundException.class)
+    ResponseEntity<Map<String, Object>> handleNotFound(NotFoundException ex) {
         return error(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
