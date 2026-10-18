@@ -14,6 +14,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Autowired;
 import codeprism.backend.dto.ChatMessageResponse;
@@ -34,6 +38,11 @@ public class ChatStreamHandler {
     private final ChatMessageRepository chatMessageRepository;
     private final CitationMapper citationMapper;
     private final double similarityThreshold;
+    private final ScheduledExecutorService keepAliveScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "sse-keepalive");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     @Autowired(required = false)
     private MeterRegistry meterRegistry;
@@ -57,7 +66,21 @@ public class ChatStreamHandler {
             String userPrompt) {
 
         SseEmitter emitter = new SseEmitter(RagSettings.STREAM_TIMEOUT_MS);
+        ScheduledFuture<?> keepAliveTask = keepAliveScheduler.scheduleAtFixedRate(() -> {
+            try {
+                emitter.send(SseEmitter.event().comment("keep-alive"));
+            } catch (Exception ex) {
+                // Client disconnected or emitter completed
+            }
+        }, 15, 15, TimeUnit.SECONDS);
+
+        Runnable cleanup = () -> keepAliveTask.cancel(true);
+        emitter.onCompletion(cleanup);
+        emitter.onTimeout(cleanup);
+        emitter.onError(t -> cleanup.run());
+
         StringBuilder fullReply = new StringBuilder();
+
 
         try {
             emitter.send(SseEmitter.event()

@@ -95,4 +95,44 @@ class ChatStreamHandlerTest {
         assertEquals("[]", saved.getCitations());
         assertEquals(0, saved.getSourcesCount());
     }
+
+    @Test
+    void testEmitterCreationWithKeepAliveAndTimeout() {
+        UUID sessionId = UUID.randomUUID();
+        ChatMessageResponse userMsg = new ChatMessageResponse(
+                UUID.randomUUID(), MessageRole.USER, "Explain main", List.of(), 0, Instant.now());
+
+        RetrievedContext context = new RetrievedContext(
+                List.of(new CitationDto("Main.java", 1, 10, "java", "semantic")),
+                "class Main {}",
+                List.of(),
+                List.of(),
+                "class Main {}",
+                "",
+                0.2, // Below 0.5 threshold to terminate cleanly without mocking full reactor stream
+                1);
+
+        ChatMessage savedAssistantMsg = ChatMessage.builder()
+                .id(UUID.randomUUID())
+                .sessionId(sessionId)
+                .role(MessageRole.ASSISTANT)
+                .content("No relevant code found in this repository for that question.")
+                .citations("[]")
+                .sourcesCount(0)
+                .createdAt(Instant.now())
+                .build();
+
+        when(chatMessageRepository.save(any(ChatMessage.class))).thenReturn(savedAssistantMsg);
+
+        SseEmitter emitter = handler.stream(
+                sessionId,
+                userMsg,
+                context,
+                "system",
+                "user");
+
+        assertNotNull(emitter);
+        assertEquals(RagSettings.STREAM_TIMEOUT_MS, emitter.getTimeout());
+    }
 }
+
