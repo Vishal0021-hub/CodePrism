@@ -80,8 +80,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Returns the API base URL for client-side fetch calls.
+ *
+ * Production (single-origin behind Nginx): empty string → relative paths (/api/…).
+ * Local development: set NEXT_PUBLIC_API_BASE_URL=http://localhost:8081 in client/.env.local
+ */
 export function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8081";
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 }
 
 export function getGithubLoginUrl() {
