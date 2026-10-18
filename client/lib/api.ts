@@ -81,14 +81,23 @@ export class ApiError extends Error {
 }
 
 /**
- * Returns the API base URL for client-side fetch calls.
+ * Returns the API base URL.
  *
- * Production (single-origin behind Nginx): empty string → relative paths (/api/…).
- * Local development: set NEXT_PUBLIC_API_BASE_URL=http://localhost:8081 in client/.env.local
+ * Browser / Client-side:
+ * - Production (single-origin behind Nginx): defaults to empty string "" → relative paths (/api/…).
+ * - Local dev: set NEXT_PUBLIC_API_BASE_URL=http://localhost:8081 in client/.env.local.
+ *
+ * Node.js / Server-side (SSR / Route Handlers):
+ * - Reads INTERNAL_API_BASE_URL (e.g. http://backend:8081 inside Docker network)
+ *   with fallback to NEXT_PUBLIC_API_BASE_URL or http://localhost:8081.
  */
 export function getApiBaseUrl() {
+  if (typeof window === "undefined") {
+    return process.env.INTERNAL_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081";
+  }
   return process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 }
+
 
 export function getGithubLoginUrl() {
   return `${getApiBaseUrl()}/oauth2/authorization/github`;

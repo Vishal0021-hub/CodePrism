@@ -59,6 +59,9 @@ public class IndexingService {
     @Value("${app.indexing.max-file-bytes:102400}")
     private long maxFileBytes;
 
+    @Value("${app.indexing.max-tree-entries:5000}")
+    private int maxTreeEntries;
+
     public Repository startIndexing(UUID repoId, UUID userId) {
         Repository repo = repositoryRepository.findByIdAndUserId(repoId, userId)
                 .orElseThrow(() -> new NotFoundException("Repository not found"));
@@ -82,6 +85,12 @@ public class IndexingService {
             doIndex(repoId, userId);
         } catch (Exception ex) {
             log.error("Indexing failed for repo {}", repoId, ex);
+            if (meterRegistry != null) {
+                io.micrometer.core.instrument.Counter.builder("codeprism.indexing.errors")
+                        .description("Repository indexing errors")
+                        .register(meterRegistry)
+                        .increment();
+            }
             markFailed(repoId, ex.getMessage());
         }
     }
@@ -99,8 +108,14 @@ public class IndexingService {
             Map<String, Object> tree = gitHubApiClient.getRepoTree(
                     token, repo.getOwner(), repo.getName(), repo.getDefaultBranch());
             List<String> filePaths = listIndexableFiles(tree);
+            if (filePaths.size() > maxTreeEntries) {
+                log.warn("Repository {} has {} files, exceeding max cap of {}. Limiting indexing to first {} files.",
+                        repo.getFullName(), filePaths.size(), maxTreeEntries, maxTreeEntries);
+                filePaths = filePaths.subList(0, maxTreeEntries);
+            }
 
             updateProgress(repoId, filePaths.size(), 0, 0, IndexStatus.INDEXING, null);
+
 
             List<Document> batch = new ArrayList<>();
             int processed = 0;
@@ -165,6 +180,12 @@ public class IndexingService {
                 vectorStore.add(batch);
                 return;
             } catch (Exception ex) {
+                if (meterRegistry != null) {
+                    io.micrometer.core.instrument.Counter.builder("codeprism.gemini.errors")
+                            .tag("service", "embedding")
+                            .register(meterRegistry)
+                            .increment();
+                }
                 String msg = ex.getMessage() != null ? ex.getMessage() : "";
                 boolean isRateLimit = msg.contains("429") || msg.contains("Quota exceeded") || msg.contains("quota");
                 if (isRateLimit && attempt < maxRetries) {

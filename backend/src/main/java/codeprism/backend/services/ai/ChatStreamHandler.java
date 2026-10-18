@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -18,7 +19,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import codeprism.backend.dto.ChatMessageResponse;
 import codeprism.backend.dto.CitationDto;
@@ -26,6 +29,7 @@ import codeprism.backend.entity.ChatMessage;
 import codeprism.backend.entity.MessageRole;
 import codeprism.backend.repository.ChatMessageRepository;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.Disposable;
 
 /**
  * Generation step: call AI model via Spring AI and stream tokens to the browser over SSE.
@@ -38,24 +42,36 @@ public class ChatStreamHandler {
     private final ChatMessageRepository chatMessageRepository;
     private final CitationMapper citationMapper;
     private final double similarityThreshold;
+    private final AtomicInteger activeStreams = new AtomicInteger(0);
+    private final MeterRegistry meterRegistry;
     private final ScheduledExecutorService keepAliveScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "sse-keepalive");
         thread.setDaemon(true);
         return thread;
     });
 
-    @Autowired(required = false)
-    private MeterRegistry meterRegistry;
-
     public ChatStreamHandler(
             ChatModel chatModel,
             ChatMessageRepository chatMessageRepository,
             CitationMapper citationMapper,
             @Value("${rag.similarity-threshold:0.5}") double similarityThreshold) {
+        this(chatModel, chatMessageRepository, citationMapper, similarityThreshold, null);
+    }
+
+    public ChatStreamHandler(
+            ChatModel chatModel,
+            ChatMessageRepository chatMessageRepository,
+            CitationMapper citationMapper,
+            @Value("${rag.similarity-threshold:0.5}") double similarityThreshold,
+            @Autowired(required = false) MeterRegistry meterRegistry) {
         this.chatModel = chatModel;
         this.chatMessageRepository = chatMessageRepository;
         this.citationMapper = citationMapper;
         this.similarityThreshold = similarityThreshold;
+        this.meterRegistry = meterRegistry;
+        if (meterRegistry != null) {
+            meterRegistry.gauge("codeprism.chat.active_streams", activeStreams);
+        }
     }
 
     public SseEmitter stream(
@@ -66,6 +82,8 @@ public class ChatStreamHandler {
             String userPrompt) {
 
         SseEmitter emitter = new SseEmitter(RagSettings.STREAM_TIMEOUT_MS);
+        activeStreams.incrementAndGet();
+
         ScheduledFuture<?> keepAliveTask = keepAliveScheduler.scheduleAtFixedRate(() -> {
             try {
                 emitter.send(SseEmitter.event().comment("keep-alive"));
@@ -74,13 +92,25 @@ public class ChatStreamHandler {
             }
         }, 15, 15, TimeUnit.SECONDS);
 
-        Runnable cleanup = () -> keepAliveTask.cancel(true);
+        AtomicBoolean cleanedUp = new AtomicBoolean(false);
+        AtomicReference<Disposable> disposableRef = new AtomicReference<>();
+
+        Runnable cleanup = () -> {
+            if (cleanedUp.compareAndSet(false, true)) {
+                activeStreams.decrementAndGet();
+                keepAliveTask.cancel(true);
+                Disposable d = disposableRef.get();
+                if (d != null && !d.isDisposed()) {
+                    d.dispose();
+                }
+            }
+        };
+
         emitter.onCompletion(cleanup);
         emitter.onTimeout(cleanup);
         emitter.onError(t -> cleanup.run());
 
         StringBuilder fullReply = new StringBuilder();
-
 
         try {
             emitter.send(SseEmitter.event()
@@ -107,6 +137,7 @@ public class ChatStreamHandler {
                         .data(toMessageResponse(assistant, 0)));
 
                 emitter.send(SseEmitter.event().name("done").data("[DONE]"));
+                cleanup.run();
                 emitter.complete();
                 return emitter;
             }
@@ -121,7 +152,7 @@ public class ChatStreamHandler {
             AtomicInteger tokenCounter = new AtomicInteger(0);
             Timer.Sample chatSample = meterRegistry != null ? Timer.start(meterRegistry) : null;
 
-            ChatClient.builder(chatModel)
+            Disposable subscription = ChatClient.builder(chatModel)
                     .build()
                     .prompt()
                     .system(systemPrompt)
@@ -135,20 +166,42 @@ public class ChatStreamHandler {
                     .doOnError(err -> {
                         log.error("Chat stream error", err);
                         recordChatMetrics(chatSample, tokenCounter.get());
+                        if (meterRegistry != null) {
+                            Counter.builder("codeprism.gemini.errors")
+                                    .tag("service", "chat")
+                                    .description("Gemini chat errors")
+                                    .register(meterRegistry)
+                                    .increment();
+                        }
+                        try {
+                            emitter.send(SseEmitter.event()
+                                    .name("error")
+                                    .data(Map.of("error", "AI service error", "message", err.getMessage() != null ? err.getMessage() : "Chat stream failed")));
+                        } catch (Exception ignored) {
+                        }
+                        cleanup.run();
                         emitter.completeWithError(err);
                     })
                     .doOnComplete(() -> {
                         recordChatMetrics(chatSample, tokenCounter.get());
+                        cleanup.run();
                         completeStream(
                                 emitter, sessionId, fullReply, retrievedContext.citations(), sourcesCount);
                     })
                     .subscribe();
+
+            disposableRef.set(subscription);
+            if (cleanedUp.get()) {
+                subscription.dispose();
+            }
         } catch (Exception ex) {
+            cleanup.run();
             emitter.completeWithError(ex);
         }
 
         return emitter;
     }
+
 
     public SseEmitter stream(
             UUID sessionId,
