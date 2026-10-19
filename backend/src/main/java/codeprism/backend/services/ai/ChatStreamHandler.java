@@ -58,6 +58,7 @@ public class ChatStreamHandler {
         this(chatModel, chatMessageRepository, citationMapper, similarityThreshold, null);
     }
 
+    @Autowired
     public ChatStreamHandler(
             ChatModel chatModel,
             ChatMessageRepository chatMessageRepository,

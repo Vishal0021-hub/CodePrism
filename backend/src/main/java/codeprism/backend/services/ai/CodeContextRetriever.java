@@ -53,18 +53,23 @@ public class CodeContextRetriever {
     }
 
     public RetrievedContext retrieve(UUID repositoryId, String question) {
-        // 1. Semantic vector similarity search
-        var filter = new FilterExpressionBuilder()
-                .eq(RagSettings.METADATA_REPO_ID, repositoryId.toString())
-                .build();
+        List<Document> semanticDocs;
+        try {
+            var filter = new FilterExpressionBuilder()
+                    .eq(RagSettings.METADATA_REPO_ID, repositoryId.toString())
+                    .build();
 
-        var search = SearchRequest.builder()
-                .query(question)
-                .topK(RagSettings.TOP_K_CHUNKS)
-                .filterExpression(filter)
-                .build();
+            var search = SearchRequest.builder()
+                    .query(question)
+                    .topK(RagSettings.TOP_K_CHUNKS)
+                    .filterExpression(filter)
+                    .build();
 
-        List<Document> semanticDocs = vectorStore.similaritySearch(search);
+            semanticDocs = vectorStore.similaritySearch(search);
+        } catch (Exception ex) {
+            log.warn("Vector similarity search failed or unconfigured: {}", ex.getMessage());
+            semanticDocs = List.of();
+        }
 
         // 2. Lexical re-rank step: boost score of chunks whose filePath or symbol contains query terms
         semanticDocs = rerankSemanticDocuments(semanticDocs, question);

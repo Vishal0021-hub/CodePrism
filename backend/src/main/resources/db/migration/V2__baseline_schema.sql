@@ -97,5 +97,7 @@ CREATE TABLE IF NOT EXISTS vector_store (
     embedding VECTOR(3072)
 );
 
-CREATE INDEX IF NOT EXISTS idx_vector_store_embedding
-    ON vector_store USING hnsw (embedding vector_cosine_ops);
+-- Note: pgvector HNSW index has a maximum limit of 2000 dimensions.
+-- Gemini embeddings use 3072 dimensions, matching spring.ai.vectorstore.pgvector.index-type=NONE.
+-- Exact nearest-neighbor cosine search is used by PostgreSQL without an HNSW index.
+
