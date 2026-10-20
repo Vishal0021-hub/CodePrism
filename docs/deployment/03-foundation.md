@@ -86,13 +86,20 @@ graph TD
 
 | Direction | Type | Protocol | Port Range | Source / Destination | Purpose & Rationale |
 |---|---|---|---|---|---|
-| **Inbound** | Custom HTTP | TCP | `80` | `pl-58a04031` (CloudFront Managed Prefix List) | Allows HTTP traffic **only** from AWS CloudFront edge nodes. Direct browser requests attempting to bypass CloudFront are dropped at the VPC boundary. |
+| **Inbound** | Custom HTTP | TCP | `80` | `com.amazonaws.global.cloudfront.origin-facing` (AWS Managed Prefix List) | Allows HTTP traffic **only** from AWS CloudFront edge nodes. In the AWS Console or Terraform, select the managed prefix list by name `com.amazonaws.global.cloudfront.origin-facing` (do **not** hardcode the prefix list ID, as the ID differs per AWS region). Direct browser requests attempting to bypass CloudFront are dropped at the VPC boundary. |
 | **Inbound** | SSH | TCP | `22` | *None (Rule Deleted)* | Fully blocked. Administrative shell access uses AWS SSM Session Manager. |
 | **Outbound** | All Traffic | Any | All | `0.0.0.0/0` | Outbound access for OS security patches, Docker image pulls from ECR, GitHub API calls, and Gemini LLM API calls. |
 
 > [!TIP]
 > **Origin Verification Header (`X-Origin-Verify`):**  
 > In addition to the security group restriction, CloudFront injects a secret custom header (e.g., `X-Origin-Verify: <secret>`) on every request forwarded to the EC2 origin. Nginx validates this header and rejects any request missing it with `HTTP 403 Forbidden`. This provides defense-in-depth against unauthorized traffic.
+
+> [!IMPORTANT]
+> **GitHub Webhook URL Configuration:**  
+> When CloudFront is created, the repository webhook in **GitHub Settings $\rightarrow$ Webhooks** must be updated to:  
+> `https://<distribution-id>.cloudfront.net/api/webhooks/github`  
+> (Content type: `application/json`, Secret: `/codeprism/prod/GITHUB_WEBHOOK_SECRET`).  
+> Likewise, in the GitHub OAuth application settings, update the Homepage URL to `https://<distribution-id>.cloudfront.net` and Authorization Callback URL to `https://<distribution-id>.cloudfront.net/login/oauth2/code/github`.
 
 ---
 
@@ -183,13 +190,14 @@ This role is attached directly to the EC2 virtual machine. It grants the instanc
       "Resource": "*"
     },
     {
-      "Sid": "S3DatabaseBackupUploads",
+      "Sid": "S3DatabaseBackupAndRestoreAccess",
       "Effect": "Allow",
       "Action": [
         "s3:PutObject",
+        "s3:GetObject",
         "s3:AbortMultipartUpload"
       ],
-      "Resource": "arn:aws:s3:::codeprism-backups-prod/database/*"
+      "Resource": "arn:aws:s3:::codeprism-backups-prod/*"
     },
     {
       "Sid": "S3BackupBucketListAccess",
@@ -202,12 +210,23 @@ This role is attached directly to the EC2 virtual machine. It grants the instanc
   ]
 }
 ```
+*Note: `s3:GetObject` and `s3:ListBucket` are explicitly included so that disaster recovery database restore drills can be executed directly on the EC2 host.*
 
 ---
 
 ### 4.2 GitHub Actions OIDC Deploy Role (`codeprism-github-deploy-role`)
 
 This role allows GitHub Actions workflows to authenticate to AWS securely **without storing any long-lived AWS Access Keys or Secrets in GitHub repository settings**. It uses OpenID Connect (OIDC) with short-lived tokens.
+
+#### Important OIDC Subject (`sub`) Format Distinction:
+- **When a job uses a GitHub Environment (`environment: production`):**  
+  GitHub sets the OIDC subject claim (`sub`) to:  
+  `repo:OWNER/REPO:environment:NAME` (e.g. `repo:Vishal0021-hub/CodePrism:environment:production`).
+- **When a job does NOT use an environment:**  
+  GitHub sets the OIDC subject claim (`sub`) to the Git reference:  
+  `repo:OWNER/REPO:ref:refs/heads/BRANCH` (e.g. `repo:Vishal0021-hub/CodePrism:ref:refs/heads/deploy/aws`).
+
+The trust policy below allows both: it authorizes the `production` environment subject, while also retaining the `deploy/aws` branch subject for workflows where environments are not enabled.
 
 #### Trust Policy (Restricted strictly to the `Vishal0021-hub/CodePrism` repository):
 ```json
@@ -225,7 +244,10 @@ This role allows GitHub Actions workflows to authenticate to AWS securely **with
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:Vishal0021-hub/CodePrism:ref:refs/heads/deploy/aws"
+          "token.actions.githubusercontent.com:sub": [
+            "repo:Vishal0021-hub/CodePrism:environment:production",
+            "repo:Vishal0021-hub/CodePrism:ref:refs/heads/deploy/aws"
+          ]
         }
       }
     }
@@ -287,7 +309,7 @@ The cost projection includes all charges: EC2 compute, the mandatory public IPv4
 - **Hours in a month:** 730 hours (average).
 - **`t3.medium` Compute:** $0.0416 / hour.
 - **`t3.small` Compute:** $0.0208 / hour.
-- **In-Use Public IPv4 Address:** $0.005 / hour (~$3.65 / 730-hour month).
+- **In-Use Public IPv4 Address:** $0.005 / hour = **$3.65 / month** (AWS charges for public IPv4 addresses continuously 24/7, even when the underlying EC2 instance is stopped).
 - **EBS gp3 Root Volume (30 GB):** $0.08 / GB-month = $2.40 / month (persists while running or stopped).
 - **EBS Snapshots (Weekly differential, ~10 GB):** $0.05 / GB-month = $0.50 / month.
 - **Amazon S3 Backups (PostgreSQL dumps, ~5 GB):** $0.023 / GB-month = $0.12 / month.
@@ -303,14 +325,14 @@ The cost projection includes all charges: EC2 compute, the mandatory public IPv4
 | Cost Component | `t3.medium` Always-On (24/7) | `t3.medium` Stopped when Idle (~8h/day) | `t3.small` Always-On (24/7) | `t3.small` Stopped when Idle (~8h/day) |
 |---|---|---|---|---|
 | **EC2 Compute** | $30.37 (730 hrs) | $8.32 (200 hrs) | $15.18 (730 hrs) | $4.16 (200 hrs) |
-| **Public IPv4 Address** ($0.005/hr) | $3.65 (730 hrs) | $1.00 (200 hrs) | $3.65 (730 hrs) | $1.00 (200 hrs) |
+| **Public IPv4 Address** ($0.005/hr) | $3.65 (730 hrs) | $3.65 (billed 24/7) | $3.65 (730 hrs) | $3.65 (billed 24/7) |
 | **EBS Storage** (30 GB gp3) | $2.40 | $2.40 | $2.40 | $2.40 |
 | **EBS Snapshots** (~10 GB) | $0.50 | $0.50 | $0.50 | $0.50 |
 | **S3 Database Backups** (~5 GB) | $0.12 | $0.12 | $0.12 | $0.12 |
 | **ECR Container Registry** (~3 GB) | $0.25 | $0.25 | $0.25 | $0.25 |
 | **CloudFront & Data Transfer** | $0.00 (Free Tier) | $0.00 (Free Tier) | $0.00 (Free Tier) | $0.00 (Free Tier) |
-| **Total Monthly Cost** | **$37.29 / mo** | **$12.59 / mo** | **$22.10 / mo** | **$8.43 / mo** |
-| **Daily Cost Rate** | ~$1.24 / day | ~$0.42 / day | ~$0.74 / day | ~$0.28 / day |
+| **Total Monthly Cost** | **$37.29 / mo** | **$15.24 / mo** | **$22.10 / mo** | **$11.08 / mo** |
+| **Daily Cost Rate** | ~$1.24 / day | ~$0.51 / day | ~$0.74 / day | ~$0.37 / day |
 
 ---
 
@@ -319,9 +341,9 @@ The cost projection includes all charges: EC2 compute, the mandatory public IPv4
 | Operating Profile | Month 1 | Month 2 | Month 3 | Month 4 | Month 5 | Month 6 | **Cumulative 6-Mo Burn** | Budget Assessment ($100–$200 Credits) |
 |---|---|---|---|---|---|---|---|---|
 | **`t3.medium` Always-On** | $37.29 | $37.29 | $37.29 | $37.29 | $37.29 | $37.29 | **$223.74** | ⚠️ Slightly exceeds $200 credit budget if left 24/7 on medium |
-| **`t3.medium` Stopped when Idle** | $12.59 | $12.59 | $12.59 | $12.59 | $12.59 | $12.59 | **$75.54** | ✅ **Safely within $100 budget** with ~$24–$124 reserve |
+| **`t3.medium` Stopped when Idle** | $15.24 | $15.24 | $15.24 | $15.24 | $15.24 | $15.24 | **$91.44** | ✅ **Safely within $100 budget** with ~$8.56–$108.56 reserve |
 | **`t3.small` Always-On** | $22.10 | $22.10 | $22.10 | $22.10 | $22.10 | $22.10 | **$132.60** | ✅ **Fits within $150–$200 credit range** |
-| **`t3.small` Stopped when Idle** | $8.43 | $8.43 | $8.43 | $8.43 | $8.43 | $8.43 | **$50.58** | 🌟 **Maximum savings:** Preserves credits for up to 12–24 months |
+| **`t3.small` Stopped when Idle** | $11.08 | $11.08 | $11.08 | $11.08 | $11.08 | $11.08 | **$66.48** | 🌟 **Maximum savings:** Preserves credits for up to 18–36 months |
 
 > [!IMPORTANT]
 > **Recommended Strategy:**  
